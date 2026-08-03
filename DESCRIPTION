@@ -1,0 +1,16 @@
+Package: SeMaCoPE
+Title: Semi Parametric Markov Model with conditional pseudo-likelihood estimation for Point Pattern Data
+Version: 0.3.1
+Authors@R: c(
+    person("Rasmus", "Waagepetersen", email = "rw@math.aau.dk", role = "aut", "cre"),
+    person("Ib Thorsgaard", "Jensen", email = "itj@math.aau.dk", role = c("aut", "cre")) )
+Maintainer: Ib Thorsgaard Jensen <itj@math.aau.dk>
+Description: Implementation of semi-parametric Markov model for multi-type point pattern data.
+Imports:
+	VGAM,
+	spatstat,
+	data.table
+License: To be decided
+Roxygen: list(markdown = TRUE)
+Encoding: UTF-8
+RoxygenNote: 8.0.0
