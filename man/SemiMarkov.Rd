@@ -12,8 +12,8 @@ SemiMarkov(
   R_within,
   R_between,
   sat = Inf,
-  standardize = T,
-  Poisson = F
+  standardize = TRUE,
+  Poisson = FALSE
 )
 }
 \arguments{

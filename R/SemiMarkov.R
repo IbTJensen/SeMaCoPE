@@ -416,33 +416,73 @@ Covariate_setup <- function(
 }
 
 beta_estimation <- function(w, betastart, p, q, Poisson) {
+  Wmat <- as.matrix(w[, -(1:4), with = FALSE])
+
+  # Group id per row (one group per observed point, i.e. per (xcoord, ycoord,
+  # type_obs) combination), computed once instead of re-derived every call.
+  grp_dt <- w[, .(xcoord, ycoord, type_obs)]
+  grp_dt[, grp := .GRP, by = .(xcoord, ycoord, type_obs)]
+  grp <- grp_dt$grp
+
+  # Row indices of the observed ("true") type, and their group ids, also
+  # computed once.
+  true_idx <- which(w$type_obs == w$j)
+  true_grp <- grp[true_idx]
+
   loglik <- function(beta) {
-    pred <- type_pred(w, beta)
-    pred <- pred[type_obs == j]
-    loglik <- sum(log(pred$prob[!is.na(pred$prob)]))
-    return(loglik)
+    cond_intensity <- as.vector(exp(Wmat %*% beta))
+    Lambda <- rowsum(cond_intensity, grp)[, 1]
+    prob_true <- cond_intensity[true_idx] / Lambda[true_grp]
+    sum(log(prob_true[!is.na(prob_true)]))
+  }
+
+  score <- function(beta){
+    cond_intensity <- as.vector(exp(Wmat %*% beta))
+    Lambda <- rowsum(cond_intensity, grp)[, 1]
+    prob <- cond_intensity / Lambda[grp]
+    hmat <- Wmat[true_idx,] - rowsum(Wmat*prob, grp)
+    colSums(hmat, na.rm = TRUE)
   }
 
   obj <- optim(
     par = betastart,
     fn = loglik,
+    gr = score,
     method = "BFGS",
     control = list(fnscale = -1)
   )
+
   return(obj)
 }
 
-type_pred <- function(w, beta){
-  cond_intensity <- exp( as.matrix(w[,-(1:4), with=F]) %*% beta )
-  pts_lam <- w[,1:4]
-  pts_lam[,lambda:=cond_intensity]
-  Lam <- pts_lam[,.(Lambda = sum(lambda)), list(xcoord, ycoord, type_obs)]
+# beta_estimation <- function(w, betastart, p, q, Poisson) {
+#   loglik <- function(beta) {
+#     pred <- type_pred(w, beta)
+#     pred <- pred[type_obs == j]
+#     loglik <- sum(log(pred$prob[!is.na(pred$prob)]))
+#     return(loglik)
+#   }
+
+#   obj <- optim(
+#     par = betastart,
+#     fn = loglik,
+#     method = "BFGS",
+#     control = list(fnscale = -1)
+#   )
+#   return(obj)
+# }
+
+type_pred <- function(w, beta) {
+  cond_intensity <- exp(as.matrix(w[, -(1:4), with = F]) %*% beta)
+  pts_lam <- w[, 1:4]
+  pts_lam[, lambda := cond_intensity]
+  Lam <- pts_lam[, .(Lambda = sum(lambda)), list(xcoord, ycoord, type_obs)]
   pts_lam <- merge.data.table(
     pts_lam,
     Lam,
     by = c("xcoord", "ycoord", "type_obs")
   )
-  pts_lam[,prob:=lambda/Lambda]
+  pts_lam[, prob := lambda / Lambda]
   pts_lam <- pts_lam[order(type_obs, xcoord, ycoord, j)]
   return(pts_lam)
 }
@@ -485,32 +525,42 @@ SemiMarkov_fixed_R <- function(
     nis[i] = Xis[[i]]$n
   }
 
-  w <- Covariate_setup(
-    X,
-    Xis,
-    nis,
-    covariate,
-    R_within,
-    R_between,
-    sat,
-    Poisson,
-    mark.pp
+  a <- Sys.time()
+  # w <- Covariate_setup_fast(
+  #   X, Xis, nis, covariate, R_within, 
+  #   R_between, sat, Poisson, mark.pp
+  # )
+  w <- Covariate_setup_rcpp(
+    X, Xis, nis, covariate, R_within, 
+    R_between, sat, Poisson, mark.pp
   )
-  gc()
+  Sys.time() - a
   q <- w$q
   w <- w$w
 
+  # a <- Sys.time()
+  # if (!is.null(edgecorrection)) {
+  #   erodedwindow = erosion(X$window, edgecorrection)
+  #   pts_in_window <- inside.owin(x = w$xcoord, y = w$ycoord, w = erodedwindow)
+  #   w <- w[pts_in_window]
+  #   X <- X[inside.owin(X, w = erodedwindow), ]
+  #   for (i in 1:p) {
+  #     pts_in_window <- inside.owin(Xis[[i]], w = erodedwindow)
+  #     Xis[[i]] = Xis[[i]][pts_in_window, ]
+  #     nis[i] = sum(pts_in_window)
+  #   }
+  # }
+  # Sys.time() - a
+
+  a <- Sys.time()
   if (!is.null(edgecorrection)) {
-    erodedwindow = erosion(X$window, edgecorrection)
-    pts_in_window <- inside.owin(x = w$xcoord, y = w$ycoord, w = erodedwindow)
-    w <- w[pts_in_window]
-    X <- X[inside.owin(X, w = erodedwindow), ]
-    for (i in 1:p) {
-      pts_in_window <- inside.owin(Xis[[i]], w = erodedwindow)
-      Xis[[i]] = Xis[[i]][pts_in_window, ]
-      nis[i] = sum(pts_in_window)
-    }
+    ec <- apply_edge_correction(X, Xis, nis, w, p, mark.pp, edgecorrection)
+    X <- ec$X
+    Xis <- ec$Xis
+    nis <- ec$nis
+    w <- ec$w
   }
+  Sys.time() - a
 
   if (!Poisson) {
     Int_var_dt <- w[, (4 + q * (p - 1) + 1):ncol(w)]
@@ -556,6 +606,7 @@ SemiMarkov_fixed_R <- function(
   response <- rep(1:p, nis)
   response <- factor(response)
 
+  a <- Sys.time()
   if (is.null(covariate)) {
     fit = vglm(response ~ 1, family = multinomial)
     betafitz = coef(fit)
@@ -577,6 +628,7 @@ SemiMarkov_fixed_R <- function(
       names(betafitz) <- gsub("Z", "", names(betafitz))
     }
   }
+  Sys.time() - a
   predictions = predict(fit, type = "response") #predicted probabilities
 
   # Add zeros to interaction parameters as starting values
@@ -596,7 +648,12 @@ SemiMarkov_fixed_R <- function(
   }
 
   # Estimate parameters
-  opt <- beta_estimation(w, betastart, p, q, Poisson)
+  a <- Sys.time()
+  # opt <- beta_estimation_fast(w, betastart, p, q, Poisson)
+  # opt <- beta_estimation(w, betastart, p, q, Poisson)
+  opt <- beta_estimation_rcpp(w, betastart, p, q, Poisson)
+  # opt3 <- beta_estimation_omp(w, betastart, p, q, Poisson, nthreads = 1)
+  Sys.time() - a
   betahat <- opt$par
   # w <- w_raw
   var_cols <- 5:ncol(w)
@@ -681,17 +738,18 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
   )
 
   H <- as.matrix(h_type_obs[, -(1:4)])
-  # H <- h_type_obs[match(X$x, h_type_obs$xcoord),-(1:4)]
-  # H <- as.matrix(h_type_obs[match(X$x, h_type_obs$xcoord),-(1:4)])
-  # cc <- closepairs(X, rmax = Int_range); gc()
-
+  n <- nrow(H)
   cc <- closepairs(X_new, rmax = Int_range)
-  gc()
-  Hu <- H[cc$i, ]
-  Hv <- H[cc$j, ]
-  Sigma_term <- t(Hu) %*% Hv
-  rm(Hu, Hv)
-  gc()
+  W <- Matrix::sparseMatrix(i = cc$i, j = cc$j, x = 1, dims = c(n, n))
+  Sigma_term <- as.matrix(t(H) %*% (W %*% H))
+
+  # cc <- closepairs(X_new, rmax = Int_range)
+  # gc()
+  # Hu <- H[cc$i, ]
+  # Hv <- H[cc$j, ]
+  # Sigma_term <- t(Hu) %*% Hv
+  # rm(Hu, Hv)
+  # gc()
 
   rownames(Sigma_term) <- names(betahat)
   colnames(Sigma_term) <- names(betahat)
@@ -773,6 +831,7 @@ SemiMarkov <- function(
   R_between, sat = Inf, standardize = TRUE, Poisson = FALSE
 ) {
   if (length(R_within) == 1 & length(R_between) == 1 & length(sat) == 1) {
+    a <- Sys.time()
     S <- SemiMarkov_fixed_R(
       X,
       covariate = covariate,
@@ -783,7 +842,9 @@ SemiMarkov <- function(
       standardize = standardize,
       Poisson = Poisson
     )
+    Sys.time() - a
 
+    a <- Sys.time()
     std_err <- Standard_error_matrix(
       X = X,
       w = S$w,
@@ -792,6 +853,7 @@ SemiMarkov <- function(
       R_between = R_between,
       sat = sat
     )
+    Sys.time() - a
 
     out <- c(S, std_err)
     return(out)
