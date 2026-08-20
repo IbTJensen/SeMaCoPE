@@ -1,8 +1,8 @@
 // Compiled Newton-Raphson solver for beta_estimation() ------------------------
-// Companion to R/beta_estimation_rcpp.R. Kept outside src/ (which R CMD
-// build/install auto-compiles as part of the package DLL) so this file is
-// purely opt-in: it is only touched when beta_estimation_rcpp() calls
-// Rcpp::sourceCpp() on it, and never affects a normal package build/install.
+// Companion to R/beta_estimation_rcpp.R. Compiled into the package DLL by
+// R CMD INSTALL and reached from R through the RcppExports wrappers, so it is
+// available wherever the package is loaded from -- no working directory
+// assumptions.
 //
 // Computes loglik, gradient, and Sensitivity (= -Hessian, the same quantity
 // already used elsewhere in this package as the Fisher-information-like "S"

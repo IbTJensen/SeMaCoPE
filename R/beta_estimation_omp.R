@@ -32,23 +32,6 @@ beta_estimation_omp <- function(
   nthreads = getOption("SeMaCoPE.threads", NULL),
   maxit = 100, tol = 1e-8, quiet = FALSE
 ) {
-  if (!requireNamespace("Rcpp", quietly = TRUE)) {
-    stop("beta_estimation_omp() requires the Rcpp package.")
-  }
-  if (!requireNamespace("RcppArmadillo", quietly = TRUE)) {
-    stop("beta_estimation_omp() requires the RcppArmadillo package.")
-  }
-  if (!exists("beta_newton_omp_cpp", mode = "function", envir = .GlobalEnv)) {
-    cpp_path <- file.path("cpp", "beta_estimation_omp.cpp")
-    if (!file.exists(cpp_path)) {
-      stop(
-        "Could not find ", cpp_path, ". beta_estimation_omp() expects to be ",
-        "run with the package root as the working directory."
-      )
-    }
-    Rcpp::sourceCpp(cpp_path)
-  }
-
   if (is.null(nthreads)) nthreads <- omp_max_threads_cpp()
   nthreads <- max(1L, as.integer(nthreads))
 

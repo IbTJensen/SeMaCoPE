@@ -11,7 +11,12 @@ Imports:
 	spatstat.geom,
 	data.table,
 	Rcpp,
-	Matrix
+	Matrix,
+	stats,
+	utils
+LinkingTo:
+	Rcpp,
+	RcppArmadillo
 License: To be decided
 Roxygen: list(markdown = TRUE)
 Encoding: UTF-8

@@ -1,7 +1,7 @@
 // Multi-threaded (OpenMP) Newton-Raphson solver for beta_estimation() ---------
 // Companion to R/beta_estimation_omp.R; parallel counterpart of
-// cpp/beta_estimation_rcpp.cpp. Kept outside src/ for the same reason: it is
-// only compiled when the R wrapper calls Rcpp::sourceCpp() on it.
+// src/beta_estimation_rcpp.cpp. Compiled into the package DLL by
+// R CMD INSTALL; see src/Makevars for the OpenMP flags.
 //
 // WHY THIS IS WORTH PARALLELISING
 // -------------------------------
@@ -41,7 +41,10 @@
 // Wmat'(Wmat .* prob); agreement is to ~1e-12 relative.
 
 // [[Rcpp::depends(RcppArmadillo)]]
-// [[Rcpp::plugins(openmp)]]
+// NOTE: no `// [[Rcpp::plugins(openmp)]]` here -- that attribute is honoured
+// only by Rcpp::sourceCpp(). Inside a package the OpenMP flags come from
+// src/Makevars; the #ifdef _OPENMP guards below keep this file compiling (and
+// running, serially) on toolchains without OpenMP.
 #include <RcppArmadillo.h>
 #include <vector>
 #include <string>

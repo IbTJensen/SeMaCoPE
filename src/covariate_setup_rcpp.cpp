@@ -1,8 +1,8 @@
 // Compiled core of Covariate_setup() ------------------------------------------
-// Companion to R/Covariate_setup_rcpp.R. Kept outside src/ (which R CMD
-// build/install auto-compiles into the package DLL) so this file is purely
-// opt-in: it is only touched when Covariate_setup_rcpp() calls
-// Rcpp::sourceCpp() on it, and never affects a normal package build/install.
+// Companion to R/Covariate_setup_rcpp.R. Compiled into the package DLL by
+// R CMD INSTALL and reached from R through the RcppExports wrappers, so it is
+// available wherever the package is loaded from -- no working directory
+// assumptions.
 //
 // WHAT THIS REPLACES
 // ------------------

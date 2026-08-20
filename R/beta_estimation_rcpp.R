@@ -36,30 +36,12 @@
 # Because the non-finite pattern depends only on the design matrix and not on
 # beta, this is done once up front rather than per iteration.
 #
-# Requires the Rcpp and RcppArmadillo packages and a C++ compiler. The
-# compiled routine is JIT-compiled once per session (via Rcpp::sourceCpp())
-# the first time beta_estimation_rcpp() is called; later calls reuse it.
+# The compiled routine lives in src/beta_estimation_rcpp.cpp and is built into
+# the package DLL by R CMD INSTALL, so no compiler is needed at run time.
 beta_estimation_rcpp <- function(
   w, betastart, p, q, Poisson,
   maxit = 100, tol = 1e-8, quiet = FALSE
 ) {
-  if (!requireNamespace("Rcpp", quietly = TRUE)) {
-    stop("beta_estimation_rcpp() requires the Rcpp package.")
-  }
-  if (!requireNamespace("RcppArmadillo", quietly = TRUE)) {
-    stop("beta_estimation_rcpp() requires the RcppArmadillo package.")
-  }
-  if (!exists("beta_newton_cpp", mode = "function", envir = .GlobalEnv)) {
-    cpp_path <- file.path("cpp", "beta_estimation_rcpp.cpp")
-    if (!file.exists(cpp_path)) {
-      stop(
-        "Could not find ", cpp_path, ". beta_estimation_rcpp() expects to ",
-        "be run with the package root as the working directory."
-      )
-    }
-    Rcpp::sourceCpp(cpp_path)
-  }
-
   Wmat <- as.matrix(w[, -(1:4), with = FALSE])
 
   grp_dt <- w[, .(xcoord, ycoord, type_obs)]

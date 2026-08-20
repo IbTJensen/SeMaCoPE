@@ -16,8 +16,10 @@
 # The spatial/combinatorial core -- neighbour counts, saturation, the DeltaS
 # computation (which in the R version is DeltaS_init()'s merge/melt/join
 # pipeline over every neighbour pair), and the Int_mat construction -- runs in
-# cpp/covariate_setup_rcpp.cpp. See that file's header for the identity that
-# collapses DeltaS_init() into two weighted radius-query passes.
+# src/covariate_setup_rcpp.cpp, compiled into the package DLL at install time
+# and called through the generated RcppExports wrapper. See that file's header
+# for the identity that collapses DeltaS_init() into two weighted radius-query
+# passes.
 #
 # The covariate handling below (spatstat `im` lookup, covariate functions,
 # user-supplied data.frames, the intercept dummies and their interactions)
@@ -48,20 +50,6 @@ Covariate_setup_rcpp <- function(
   X, Xis, nis, covariate, R_within,
   R_between, sat, Poisson, mark.pp
 ) {
-  if (!requireNamespace("Rcpp", quietly = TRUE)) {
-    stop("Covariate_setup_rcpp() requires the Rcpp package.")
-  }
-  if (!exists("covariate_setup_core_cpp", mode = "function", envir = .GlobalEnv)) {
-    cpp_path <- file.path("cpp", "covariate_setup_rcpp.cpp")
-    if (!file.exists(cpp_path)) {
-      stop(
-        "Could not find ", cpp_path, ". Covariate_setup_rcpp() expects to be ",
-        "run with the package root as the working directory."
-      )
-    }
-    Rcpp::sourceCpp(cpp_path)
-  }
-
   p <- length(Xis)
   n <- X$n
   sat_i <- rep(sat, p)

@@ -1,0 +1,8 @@
+## OpenMP is used by beta_estimation_omp.cpp. The `// [[Rcpp::plugins(openmp)]]`
+## attribute only works with Rcpp::sourceCpp(); inside a package the flags must
+## come from here. Where the toolchain has no OpenMP these variables expand to
+## nothing and the #ifdef _OPENMP guards in the sources fall back to serial.
+PKG_CXXFLAGS = $(SHLIB_OPENMP_CXXFLAGS)
+
+## RcppArmadillo needs the R-configured BLAS/LAPACK.
+PKG_LIBS = $(SHLIB_OPENMP_CXXFLAGS) $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
