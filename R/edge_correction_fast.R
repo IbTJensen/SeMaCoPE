@@ -40,7 +40,7 @@ apply_edge_correction <- function(
   X, Xis, nis, w, p, mark.pp, edgecorrection, erodedwindow = NULL
 ) {
   if (is.null(erodedwindow)) {
-    erodedwindow <- erosion(X$window, edgecorrection)
+    erodedwindow <- spatstat.geom::erosion(X$window, edgecorrection)
   }
 
   # --- (1) mask for w, testing each distinct location once ---
@@ -55,10 +55,10 @@ apply_edge_correction <- function(
   }
 
   if (fast_ok) {
-    keep_u <- inside.owin(x = ux, y = uy, w = erodedwindow)
+    keep_u <- spatstat.geom::inside.owin(x = ux, y = uy, w = erodedwindow)
     pts_in_window <- rep(keep_u, each = p)
   } else {
-    pts_in_window <- inside.owin(
+    pts_in_window <- spatstat.geom::inside.owin(
       x = w$xcoord,
       y = w$ycoord,
       w = erodedwindow
@@ -67,7 +67,7 @@ apply_edge_correction <- function(
   w <- w[pts_in_window]
 
   # --- (2) one mask for X, reused for every Xis[[i]] ---
-  keep_X <- inside.owin(X, w = erodedwindow)
+  keep_X <- spatstat.geom::inside.owin(X, w = erodedwindow)
   marks_int <- as.integer(X$marks)
   for (i in 1:p) {
     keep_i <- keep_X[marks_int == as.integer(mark.pp[i])]

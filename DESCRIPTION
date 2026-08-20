@@ -8,8 +8,10 @@ Maintainer: Ib Thorsgaard Jensen <itj@math.aau.dk>
 Description: Implementation of semi-parametric Markov model for multi-type point pattern data.
 Imports:
 	VGAM,
-	spatstat,
-	data.table
+	spatstat.geom,
+	data.table,
+	Rcpp,
+	Matrix
 License: To be decided
 Roxygen: list(markdown = TRUE)
 Encoding: UTF-8

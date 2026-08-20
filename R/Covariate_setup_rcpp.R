@@ -66,7 +66,7 @@ Covariate_setup_rcpp <- function(
   n <- X$n
   sat_i <- rep(sat, p)
 
-  prelim_dt <- data.table(
+  prelim_dt <- data.table::data.table(
     xcoord = X$x,
     ycoord = X$y,
     type_obs = as.integer(X$marks)
@@ -96,8 +96,10 @@ Covariate_setup_rcpp <- function(
   }
 
   # Construct interaction matrix
-  pts <- lapply(1:p, function(j) data.table(prelim_dt[, 1:3], j = j))
-  pts <- rbindlist(pts)
+  pts <- lapply(1:p, function(j) {
+    data.table::data.table(prelim_dt[, 1:3], j = j)
+  })
+  pts <- data.table::rbindlist(pts)
 
   # Spatial covariates
   ## Intercept
@@ -108,7 +110,7 @@ Covariate_setup_rcpp <- function(
   q <- 1
   ## Covariate input
   covar.function <- function(X, covariate, covar_name, spat_cov) {
-    Z <- data.table(
+    Z <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks),
@@ -125,7 +127,7 @@ Covariate_setup_rcpp <- function(
   }
 
   covar.im <- function(X, covariate, covar_name, spat_cov) {
-    Z <- data.table(
+    Z <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks),
@@ -142,7 +144,7 @@ Covariate_setup_rcpp <- function(
   }
 
   if (!is.null(covariate)) {
-    if (is.im(covariate)) {
+    if (spatstat.geom::is.im(covariate)) {
       spat_cov <- covar.im(X, covariate, covar_name = "Covariate", spat_cov)
       q <- 2
     }
@@ -183,7 +185,7 @@ Covariate_setup_rcpp <- function(
           "all columns must be named."
         )
       }
-      Z <- data.table(
+      Z <- data.table::data.table(
         xcoord = X$x,
         ycoord = X$y,
         type_obs = as.integer(X$marks)
@@ -210,8 +212,8 @@ Covariate_setup_rcpp <- function(
       spat_cov[, c(covar_names) := NULL]
       spat_cov <- cbind(spat_cov, cov_mat)
     }
-    if (is.list(covariate) & !is.im(covariate) & !is.data.frame(covariate)) {
-      check_im <- unlist(lapply(covariate, is.im))
+    if (is.list(covariate) & !spatstat.geom::is.im(covariate) & !is.data.frame(covariate)) {
+      check_im <- unlist(lapply(covariate, spatstat.geom::is.im))
       check_fct <- unlist(lapply(covariate, is.function))
       if (!all(check_im | check_fct)) {
         stop(
@@ -226,7 +228,7 @@ Covariate_setup_rcpp <- function(
           paste("Covariate", i),
           names(covariate)[i]
         )
-        if (is.im(covariate[[i]])) {
+        if (spatstat.geom::is.im(covariate[[i]])) {
           spat_cov <- covar.im(X, covariate, covar_name, spat_cov)
         }
         if (is.function(covariate[[i]])) {

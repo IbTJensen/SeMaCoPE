@@ -64,12 +64,12 @@
 # Verbatim copy of DeltaS_init() (R/SemiMarkov.R:6-102) with the explicit
 # gc() calls removed -- see note (E) above.
 DeltaS_init_fast <- function(All_neighbours_between, Neighbours, p, between) {
-  All_neighbours <- merge.data.table(
+  All_neighbours <- data.table::merge.data.table(
     x = Neighbours,
     y = All_neighbours_between,
     by = c("Neighbour_x", "Neighbour_y", "Neighbour_type")
   )
-  setcolorder(All_neighbours, c("xcoord", "ycoord", "type_obs"))
+  data.table::setcolorder(All_neighbours, c("xcoord", "ycoord", "type_obs"))
   colnames(All_neighbours)[-(1:6)] <- paste(
     rep(1:p, each = p),
     rep(1:p, p),
@@ -91,7 +91,7 @@ DeltaS_init_fast <- function(All_neighbours_between, Neighbours, p, between) {
     unlist(lapply(strsplit(x, split = split), function(x) x[i]))
   }
 
-  All_neighbours <- melt(
+  All_neighbours <- data.table::melt(
     data = All_neighbours,
     id.vars = 1:6,
     variable.name = "l",
@@ -124,7 +124,7 @@ DeltaS_init_fast <- function(All_neighbours_between, Neighbours, p, between) {
 
   n_pts <- nrow(Neighbours)
   n_comb <- nrow(kl_comb)
-  dummy_neighbours <- data.table(
+  dummy_neighbours <- data.table::data.table(
     Neighbours[rep(seq_len(n_pts), times = n_comb), 1:3],
     Neighbour_type = rep(kl_comb$Neighbour_type, each = n_pts),
     l = rep(kl_comb$l, each = n_pts)
@@ -137,14 +137,14 @@ DeltaS_init_fast <- function(All_neighbours_between, Neighbours, p, between) {
     "l"
   )
 
-  All_neighbours <- merge.data.table(
+  All_neighbours <- data.table::merge.data.table(
     x = All_neighbours,
     y = dummy_neighbours,
     by = c("xcoord", "ycoord", "type_obs", "Neighbour_type", "l"),
     all = T
   )
   All_neighbours[is.na(s_Strauss_kl_v), s_Strauss_kl_v := 0]
-  setcolorder(
+  data.table::setcolorder(
     All_neighbours,
     c(
       "xcoord",
@@ -166,7 +166,7 @@ Covariate_setup_fast <- function(
   n <- X$n
   sat_i <- rep(sat, p)
   sat_all <- rep(sat_i, nis)
-  prelim_dt <- data.table(
+  prelim_dt <- data.table::data.table(
     xcoord = X$x,
     ycoord = X$y,
     type_obs = as.integer(X$marks)
@@ -177,7 +177,7 @@ Covariate_setup_fast <- function(
 
   if (!Poisson) {
     # Calculate the number of neighbours of each type each point has.
-    Neighbours <- data.table(
+    Neighbours <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks)
@@ -190,10 +190,10 @@ Covariate_setup_fast <- function(
       for (i in 1:p) {
         Xi <- Xis[[i]]
         if (i == l) {
-          cc <- closepairs(Xi, rmax = radius)
+          cc <- spatstat.geom::closepairs(Xi, rmax = radius)
         }
         if (i != l) {
-          cc <- crosspairs(Xi, Xl, rmax = radius)
+          cc <- spatstat.geom::crosspairs(Xi, Xl, rmax = radius)
         }
         N <- table(factor(cc$i, levels = 1:nis[i]))
         R_l_close_type_l_neighbours <- c(R_l_close_type_l_neighbours, N)
@@ -231,7 +231,7 @@ Covariate_setup_fast <- function(
     # R_kl = R_lk, and that s_kl(u) denotes the number of R_kl-close type l
     # points of u (up to saturation). Thus s_kl = s_il for all k,i. Below,
     # s_i is such that s_i = s_ki for all k.
-    s_mat <- data.table(Neighbours[, -(1:3)])
+    s_mat <- data.table::data.table(Neighbours[, -(1:3)])
     colnames(s_mat) <- gsub("N", "s", colnames(s_mat))
     s_mat[s_mat > sat_mat] <- sat_mat[s_mat > sat_mat]
     prelim_dt <- cbind(prelim_dt, s_mat)
@@ -246,14 +246,14 @@ Covariate_setup_fast <- function(
       for (l in 1:p) {
         Xl <- Xis[[l]]
         if (l == k) {
-          cc_between <- closepairs(Xl, rmax = R_between)
-          cc_within <- closepairs(Xl, rmax = R_within)
+          cc_between <- spatstat.geom::closepairs(Xl, rmax = R_between)
+          cc_within <- spatstat.geom::closepairs(Xl, rmax = R_within)
         }
         if (l != k) {
-          cc_between <- crosspairs(Xk, Xl, rmax = R_between)
-          cc_within <- crosspairs(Xk, Xl, rmax = R_within)
+          cc_between <- spatstat.geom::crosspairs(Xk, Xl, rmax = R_between)
+          cc_within <- spatstat.geom::crosspairs(Xk, Xl, rmax = R_within)
         }
-        dt <- data.table(
+        dt <- data.table::data.table(
           xcoord = cc_between$xi,
           ycoord = cc_between$yi,
           type_obs = k,
@@ -263,7 +263,7 @@ Covariate_setup_fast <- function(
         )
         All_neighbours_between_kl[[j]] <- dt
 
-        dt <- data.table(
+        dt <- data.table::data.table(
           xcoord = cc_within$xi,
           ycoord = cc_within$yi,
           type_obs = k,
@@ -276,8 +276,8 @@ Covariate_setup_fast <- function(
       }
     }
 
-    All_neighbours_between <- rbindlist(All_neighbours_between_kl)
-    All_neighbours_within <- rbindlist(All_neighbours_within_kk)
+    All_neighbours_between <- data.table::rbindlist(All_neighbours_between_kl)
+    All_neighbours_within <- data.table::rbindlist(All_neighbours_within_kk)
 
     colnames(Neighbours)[1:3] <- c(
       "Neighbour_x",
@@ -305,14 +305,17 @@ Covariate_setup_fast <- function(
       by = list(xcoord, ycoord, type_obs, Neighbour_type, l)
     ] -> Delta_S_maybe
     Delta_S_maybe[, kl_name := paste0("DeltaS_", Neighbour_type, l)]
-    DeltaS_wide <- dcast(
+    DeltaS_wide <- data.table::dcast(
       Delta_S_maybe,
       xcoord + ycoord + type_obs ~ kl_name,
       value.var = "DeltaS_kl"
     )
     kl_order <- paste0("DeltaS_", rep(1:p, each = p), rep(1:p, p))
-    setcolorder(DeltaS_wide, c("xcoord", "ycoord", "type_obs", kl_order))
-    prelim_dt <- merge.data.table(
+    data.table::setcolorder(
+      DeltaS_wide,
+      c("xcoord", "ycoord", "type_obs", kl_order)
+    )
+    prelim_dt <- data.table::merge.data.table(
       prelim_dt,
       DeltaS_wide,
       by = c("xcoord", "ycoord", "type_obs")
@@ -320,8 +323,10 @@ Covariate_setup_fast <- function(
   }
 
   # Construct interaction matrix
-  pts <- lapply(1:p, function(j) data.table(prelim_dt[, 1:3], j = j))
-  pts <- rbindlist(pts)
+  pts <- lapply(1:p, function(j) {
+    data.table::data.table(prelim_dt[, 1:3], j = j)
+  })
+  pts <- data.table::rbindlist(pts)
   if (!Poisson) {
     m <- 3 + 1:p^2
     s_full <- as.matrix(prelim_dt[, ..m])
@@ -351,7 +356,7 @@ Covariate_setup_fast <- function(
   q <- 1
   ## Covariate input
   covar.function <- function(X, covariate, covar_name, spat_cov) {
-    Z <- data.table(
+    Z <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks),
@@ -368,7 +373,7 @@ Covariate_setup_fast <- function(
   }
 
   covar.im <- function(X, covariate, covar_name, spat_cov) {
-    Z <- data.table(
+    Z <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks),
@@ -385,7 +390,7 @@ Covariate_setup_fast <- function(
   }
 
   if (!is.null(covariate)) {
-    if (is.im(covariate)) {
+    if (spatstat.geom::is.im(covariate)) {
       spat_cov <- covar.im(X, covariate, covar_name = "Covariate", spat_cov)
       q <- 2
     }
@@ -426,7 +431,7 @@ Covariate_setup_fast <- function(
           "all columns must be named."
         )
       }
-      Z <- data.table(
+      Z <- data.table::data.table(
         xcoord = X$x,
         ycoord = X$y,
         type_obs = as.integer(X$marks)
@@ -453,8 +458,8 @@ Covariate_setup_fast <- function(
       spat_cov[, c(covar_names) := NULL]
       spat_cov <- cbind(spat_cov, cov_mat)
     }
-    if (is.list(covariate) & !is.im(covariate) & !is.data.frame(covariate)) {
-      check_im <- unlist(lapply(covariate, is.im))
+    if (is.list(covariate) & !spatstat.geom::is.im(covariate) & !is.data.frame(covariate)) {
+      check_im <- unlist(lapply(covariate, spatstat.geom::is.im))
       check_fct <- unlist(lapply(covariate, is.function))
       if (!all(check_im | check_fct)) {
         stop(
@@ -469,7 +474,7 @@ Covariate_setup_fast <- function(
           paste("Covariate", i),
           names(covariate)[i]
         )
-        if (is.im(covariate[[i]])) {
+        if (spatstat.geom::is.im(covariate[[i]])) {
           spat_cov <- covar.im(X, covariate, covar_name, spat_cov)
         }
         if (is.function(covariate[[i]])) {

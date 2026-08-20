@@ -1,15 +1,13 @@
-#' @importFrom spatstat.geom closepairs crosspairs duplicated.ppp is.im erosion inside.owin
-#' @importFrom data.table data.table setcolorder melt rbindlist
-#' @importFrom VGAM vglm multinomial
+#' @importFrom data.table data.table
 
 # Calculate ΔS_ij for i,j=1,...,p ----------------------------------------------
 DeltaS_init <- function(All_neighbours_between, Neighbours, p, between) {
-  All_neighbours <- merge.data.table(
+  All_neighbours <- data.table::merge.data.table(
     x = Neighbours,
     y = All_neighbours_between,
     by = c("Neighbour_x", "Neighbour_y", "Neighbour_type")
   )
-  setcolorder(All_neighbours, c("xcoord", "ycoord", "type_obs"))
+  data.table::setcolorder(All_neighbours, c("xcoord", "ycoord", "type_obs"))
   colnames(All_neighbours)[-(1:6)] <- paste(
     rep(1:p, each = p),
     rep(1:p, p),
@@ -31,13 +29,12 @@ DeltaS_init <- function(All_neighbours_between, Neighbours, p, between) {
     unlist(lapply(strsplit(x, split = split), function(x) x[i]))
   }
 
-  All_neighbours <- melt(
+  All_neighbours <- data.table::melt(
     data = All_neighbours,
     id.vars = 1:6,
     variable.name = "l",
     value.name = "s_Strauss_kl_v"
   )
-  gc()
   # Each row of All_neighbours contains points (u,i), its neighbour (v,k)
   # and s_kl(v, x_l\v) for k,l=1,...,p. Note that neighbour_type = k
 
@@ -48,13 +45,9 @@ DeltaS_init <- function(All_neighbours_between, Neighbours, p, between) {
   names(Int_types2) <- Int_types
 
   All_neighbours[, l := as.character(l)]
-  gc()
   All_neighbours[, l2 := Int_types1[l]]
-  gc()
   All_neighbours <- All_neighbours[Neighbour_type == l2]
-  gc()
   All_neighbours[, ":="(l = as.integer(Int_types2[l]), l2 = NULL)]
-  gc()
 
   # For points with no neighbours, create a dummy point of each type,
   # where s_i is zero for all i
@@ -68,9 +61,9 @@ DeltaS_init <- function(All_neighbours_between, Neighbours, p, between) {
   }
 
   apply(kl_comb, 1, function(x) {
-    data.table(Neighbours[, 1:3], Neighbour_type = x[1], l = x[2])
+    data.table::data.table(Neighbours[, 1:3], Neighbour_type = x[1], l = x[2])
   }) -> dummy_neighbours
-  dummy_neighbours <- rbindlist(dummy_neighbours)
+  dummy_neighbours <- data.table::rbindlist(dummy_neighbours)
   colnames(dummy_neighbours) <- c(
     "xcoord",
     "ycoord",
@@ -79,7 +72,7 @@ DeltaS_init <- function(All_neighbours_between, Neighbours, p, between) {
     "l"
   )
 
-  All_neighbours <- merge.data.table(
+  All_neighbours <- data.table::merge.data.table(
     x = All_neighbours,
     y = dummy_neighbours,
     by = c("xcoord", "ycoord", "type_obs", "Neighbour_type", "l"),
@@ -87,7 +80,7 @@ DeltaS_init <- function(All_neighbours_between, Neighbours, p, between) {
   )
   gc()
   All_neighbours[is.na(s_Strauss_kl_v), s_Strauss_kl_v := 0]
-  setcolorder(
+  data.table::setcolorder(
     All_neighbours,
     c(
       "xcoord",
@@ -113,7 +106,7 @@ Covariate_setup <- function(
   sat_all <- rep(sat_i, nis)
   # The data.table prelim_dt will end up containing s_kl and Delta S_kl in each
   # point (i.e. the ingredients necessary to construct the w_i(u)'s).
-  prelim_dt <- data.table(
+  prelim_dt <- data.table::data.table(
     xcoord = X$x,
     ycoord = X$y,
     type_obs = as.integer(X$marks)
@@ -124,7 +117,7 @@ Covariate_setup <- function(
 
   if (!Poisson) {
     # Calculate the number of neighbours of each type each point has
-    Neighbours <- data.table(
+    Neighbours <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks)
@@ -136,10 +129,10 @@ Covariate_setup <- function(
         for (i in 1:p) {
           Xi <- Xis[[i]]
           if (i == l) {
-            cc <- closepairs(Xi, rmax = R[k, l])
+            cc <- spatstat.geom::closepairs(Xi, rmax = R[k, l])
           }
           if (i != l) {
-            cc <- crosspairs(Xi, Xl, rmax = R[k, l])
+            cc <- spatstat.geom::crosspairs(Xi, Xl, rmax = R[k, l])
           }
           N <- table(factor(cc$i, levels = 1:nis[i]))
           R_kl_close_type_l_neighbours <- c(R_kl_close_type_l_neighbours, N)
@@ -160,7 +153,7 @@ Covariate_setup <- function(
     # R_kl = R_lk, and that s_kl(u) denotes the number of R_kl-close type l
     # points of u (up to saturation). Thus s_kl = s_il for all k,i. Below,
     # s_i is such that s_i = s_ki for all k.
-    s_mat <- data.table(Neighbours[, -(1:3)])
+    s_mat <- data.table::data.table(Neighbours[, -(1:3)])
     colnames(s_mat) <- gsub("N", "s", colnames(s_mat))
     s_mat[s_mat > sat_mat] <- sat_mat[s_mat > sat_mat]
     prelim_dt <- cbind(prelim_dt, s_mat)
@@ -176,14 +169,14 @@ Covariate_setup <- function(
       for (l in 1:p) {
         Xl <- Xis[[l]]
         if (l == k) {
-          cc_between <- closepairs(Xl, rmax = R_between)
-          cc_within <- closepairs(Xl, rmax = R_within)
+          cc_between <- spatstat.geom::closepairs(Xl, rmax = R_between)
+          cc_within <- spatstat.geom::closepairs(Xl, rmax = R_within)
         }
         if (l != k) {
-          cc_between <- crosspairs(Xk, Xl, rmax = R_between)
-          cc_within <- crosspairs(Xk, Xl, rmax = R_within)
+          cc_between <- spatstat.geom::crosspairs(Xk, Xl, rmax = R_between)
+          cc_within <- spatstat.geom::crosspairs(Xk, Xl, rmax = R_within)
         }
-        dt <- data.table(
+        dt <- data.table::data.table(
           xcoord = cc_between$xi,
           ycoord = cc_between$yi,
           type_obs = k,
@@ -193,7 +186,7 @@ Covariate_setup <- function(
         )
         All_neighbours_between_kl[[j]] <- dt
 
-        dt <- data.table(
+        dt <- data.table::data.table(
           xcoord = cc_within$xi,
           ycoord = cc_within$yi,
           type_obs = k,
@@ -206,8 +199,8 @@ Covariate_setup <- function(
       }
     }
 
-    All_neighbours_between <- rbindlist(All_neighbours_between_kl)
-    All_neighbours_within <- rbindlist(All_neighbours_within_kk)
+    All_neighbours_between <- data.table::rbindlist(All_neighbours_between_kl)
+    All_neighbours_within <- data.table::rbindlist(All_neighbours_within_kk)
 
     colnames(Neighbours)[1:3] <- c(
       "Neighbour_x",
@@ -236,7 +229,7 @@ Covariate_setup <- function(
     ] -> Delta_S_maybe
     for (k in 1:p) {
       for (j in 1:p) {
-        merge.data.table(
+        data.table::merge.data.table(
           prelim_dt,
           Delta_S_maybe[Neighbour_type == k & l == j, -(4:5)],
           by = c("xcoord", "ycoord", "type_obs")
@@ -247,8 +240,8 @@ Covariate_setup <- function(
   }
 
   # Construct interaction matrix
-  pts <- lapply(1:p, function(j) data.table(prelim_dt[, 1:3], j = j))
-  pts <- rbindlist(pts)
+  pts <- lapply(1:p, function(j) data.table::data.table(prelim_dt[, 1:3], j = j))
+  pts <- data.table::rbindlist(pts)
   if (!Poisson) {
     Int_mat_list <- list()
     for (j in 1:p) {
@@ -275,7 +268,7 @@ Covariate_setup <- function(
   q <- 1
   ## Covariate input
   covar.function <- function(X, covariate, covar_name, spat_cov) {
-    Z <- data.table(
+    Z <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks),
@@ -292,7 +285,7 @@ Covariate_setup <- function(
   }
 
   covar.im <- function(X, covariate, covar_name, spat_cov) {
-    Z <- data.table(
+    Z <- data.table::data.table(
       xcoord = X$x,
       ycoord = X$y,
       type_obs = as.integer(X$marks),
@@ -309,7 +302,7 @@ Covariate_setup <- function(
   }
 
   if (!is.null(covariate)) {
-    if (is.im(covariate)) {
+    if (spatstat.geom::is.im(covariate)) {
       spat_cov <- covar.im(X, covariate, covar_name = "Covariate", spat_cov)
       q <- 2
     }
@@ -350,7 +343,7 @@ Covariate_setup <- function(
           "all columns must be named."
         )
       }
-      Z <- data.table(
+      Z <- data.table::data.table(
         xcoord = X$x,
         ycoord = X$y,
         type_obs = as.integer(X$marks)
@@ -378,8 +371,8 @@ Covariate_setup <- function(
       spat_cov[, c(covar_names) := NULL]
       spat_cov <- cbind(spat_cov, cov_mat)
     }
-    if (is.list(covariate) & !is.im(covariate) & !is.data.frame(covariate)) {
-      check_im <- unlist(lapply(covariate, is.im))
+    if (is.list(covariate) & !spatstat.geom::is.im(covariate) & !is.data.frame(covariate)) {
+      check_im <- unlist(lapply(covariate, spatstat.geom::is.im))
       check_fct <- unlist(lapply(covariate, is.function))
       if (!all(check_im | check_fct)) {
         stop(
@@ -394,7 +387,7 @@ Covariate_setup <- function(
           paste("Covariate", i),
           names(covariate)[i]
         )
-        if (is.im(covariate[[i]])) {
+        if (spatstat.geom::is.im(covariate[[i]])) {
           spat_cov <- covar.im(X, covariate, covar_name, spat_cov)
         }
         if (is.function(covariate[[i]])) {
@@ -477,7 +470,7 @@ type_pred <- function(w, beta) {
   pts_lam <- w[, 1:4]
   pts_lam[, lambda := cond_intensity]
   Lam <- pts_lam[, .(Lambda = sum(lambda)), list(xcoord, ycoord, type_obs)]
-  pts_lam <- merge.data.table(
+  pts_lam <- data.table::merge.data.table(
     pts_lam,
     Lam,
     by = c("xcoord", "ycoord", "type_obs")
@@ -525,7 +518,6 @@ SemiMarkov_fixed_R <- function(
     nis[i] = Xis[[i]]$n
   }
 
-  a <- Sys.time()
   # w <- Covariate_setup_fast(
   #   X, Xis, nis, covariate, R_within, 
   #   R_between, sat, Poisson, mark.pp
@@ -534,25 +526,23 @@ SemiMarkov_fixed_R <- function(
     X, Xis, nis, covariate, R_within, 
     R_between, sat, Poisson, mark.pp
   )
-  Sys.time() - a
   q <- w$q
   w <- w$w
 
   # a <- Sys.time()
   # if (!is.null(edgecorrection)) {
-  #   erodedwindow = erosion(X$window, edgecorrection)
-  #   pts_in_window <- inside.owin(x = w$xcoord, y = w$ycoord, w = erodedwindow)
+  #   erodedwindow = spatstat.geom::erosion(X$window, edgecorrection)
+  #   pts_in_window <- spatstat.geom::inside.owin(x = w$xcoord, y = w$ycoord, w = erodedwindow)
   #   w <- w[pts_in_window]
-  #   X <- X[inside.owin(X, w = erodedwindow), ]
+  #   X <- X[spatstat.geom::inside.owin(X, w = erodedwindow), ]
   #   for (i in 1:p) {
-  #     pts_in_window <- inside.owin(Xis[[i]], w = erodedwindow)
+  #     pts_in_window <- spatstat.geom::inside.owin(Xis[[i]], w = erodedwindow)
   #     Xis[[i]] = Xis[[i]][pts_in_window, ]
   #     nis[i] = sum(pts_in_window)
   #   }
   # }
   # Sys.time() - a
 
-  a <- Sys.time()
   if (!is.null(edgecorrection)) {
     ec <- apply_edge_correction(X, Xis, nis, w, p, mark.pp, edgecorrection)
     X <- ec$X
@@ -560,7 +550,6 @@ SemiMarkov_fixed_R <- function(
     nis <- ec$nis
     w <- ec$w
   }
-  Sys.time() - a
 
   if (!Poisson) {
     Int_var_dt <- w[, (4 + q * (p - 1) + 1):ncol(w)]
@@ -573,10 +562,10 @@ SemiMarkov_fixed_R <- function(
       }
     }) -> nms
     nms <- unlist(nms)
-    w_sym <- data.table(t(rowsum(t(Int_var_dt), nms)))
+    w_sym <- data.table::data.table(t(rowsum(t(Int_var_dt), nms)))
     w <- cbind(w[, 1:(4 + q * (p - 1))], w_sym)
   }
-  w_raw <- data.table(w)
+  w_raw <- data.table::data.table(w)
 
   w_var <- w[, (4 + p):ncol(w)]
   if (standardize) {
@@ -606,9 +595,8 @@ SemiMarkov_fixed_R <- function(
   response <- rep(1:p, nis)
   response <- factor(response)
 
-  a <- Sys.time()
   if (is.null(covariate)) {
-    fit = vglm(response ~ 1, family = multinomial)
+    fit = VGAM::vglm(response ~ 1, family = VGAM::multinomial)
     betafitz = coef(fit)
   } else {
     covar_cols <- colnames(w)[
@@ -618,7 +606,7 @@ SemiMarkov_fixed_R <- function(
     Z <- as.matrix(w[order(j)][j == 1, ..covar_cols])
     colnames(Z) <- gsub(":1", "", colnames(Z))
 
-    fit = vglm(response ~ Z, family = multinomial)
+    fit = VGAM::vglm(response ~ Z, family = VGAM::multinomial)
     betafitz = coef(fit)
 
     if (q == 2) {
@@ -628,7 +616,6 @@ SemiMarkov_fixed_R <- function(
       names(betafitz) <- gsub("Z", "", names(betafitz))
     }
   }
-  Sys.time() - a
   predictions = predict(fit, type = "response") #predicted probabilities
 
   # Add zeros to interaction parameters as starting values
@@ -648,12 +635,7 @@ SemiMarkov_fixed_R <- function(
   }
 
   # Estimate parameters
-  a <- Sys.time()
-  # opt <- beta_estimation_fast(w, betastart, p, q, Poisson)
-  # opt <- beta_estimation(w, betastart, p, q, Poisson)
   opt <- beta_estimation_rcpp(w, betastart, p, q, Poisson)
-  # opt3 <- beta_estimation_omp(w, betastart, p, q, Poisson, nthreads = 1)
-  Sys.time() - a
   betahat <- opt$par
   # w <- w_raw
   var_cols <- 5:ncol(w)
@@ -670,7 +652,7 @@ SemiMarkov_fixed_R <- function(
   pred_no_int <- w[, 1:4]
   pred_no_int[, lambda := cond_no_int]
   Lam <- pred_no_int[, .(Lambda = sum(lambda)), list(xcoord, ycoord, type_obs)]
-  pred_no_int <- merge.data.table(
+  pred_no_int <- data.table::merge.data.table(
     pred_no_int,
     Lam,
     by = c("xcoord", "ycoord", "type_obs")
@@ -730,7 +712,7 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
   Int_range <- ifelse(sat == Inf, Int_range, 2 * Int_range)
   h_type_obs <- na.omit(h)[type_obs == j]
 
-  X_new <- ppp(
+  X_new <- spatstat.geom::ppp(
     x = h_type_obs$xcoord,
     y = h_type_obs$ycoord,
     window = X$window,
@@ -739,11 +721,11 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
 
   H <- as.matrix(h_type_obs[, -(1:4)])
   n <- nrow(H)
-  cc <- closepairs(X_new, rmax = Int_range)
+  cc <- spatstat.geom::closepairs(X_new, rmax = Int_range)
   W <- Matrix::sparseMatrix(i = cc$i, j = cc$j, x = 1, dims = c(n, n))
   Sigma_term <- as.matrix(t(H) %*% (W %*% H))
 
-  # cc <- closepairs(X_new, rmax = Int_range)
+  # cc <- spatstat.geom::closepairs(X_new, rmax = Int_range)
   # gc()
   # Hu <- H[cc$i, ]
   # Hv <- H[cc$j, ]
@@ -761,7 +743,7 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
   V <- S_inv %*% Sigma %*% S_inv
   std_err <- sqrt(diag(V))
 
-  CI <- data.table(
+  CI <- data.table::data.table(
     Covariate = names(betahat),
     Estimate = betahat,
     Lower_CI = betahat - 1.96 * std_err,
@@ -949,18 +931,18 @@ Covariance_true_val <- function(
   w <- w$w
 
   if (!is.null(edgecorrection)) {
-    erodedwindow = erosion(X$window, edgecorrection)
-    pts_in_window <- inside.owin(x = w$xcoord, y = w$ycoord, w = erodedwindow)
+    erodedwindow = spatstat.geom::erosion(X$window, edgecorrection)
+    pts_in_window <- spatstat.geom::inside.owin(x = w$xcoord, y = w$ycoord, w = erodedwindow)
     w <- w[pts_in_window]
-    X <- X[inside.owin(X, w = erodedwindow), ]
+    X <- X[spatstat.geom::inside.owin(X, w = erodedwindow), ]
     for (i in 1:p) {
-      pts_in_window <- inside.owin(Xis[[i]], w = erodedwindow)
+      pts_in_window <- spatstat.geom::inside.owin(Xis[[i]], w = erodedwindow)
       Xis[[i]] = Xis[[i]][pts_in_window, ]
       nis[i] = sum(pts_in_window)
     }
   }
 
-  w_raw <- data.table(w)
+  w_raw <- data.table::data.table(w)
   if (!Poisson) {
     Int_var_dt <- w[, (4 + q * (p - 1) + 1):ncol(w)]
     nms <- colnames(Int_var_dt)
@@ -972,7 +954,7 @@ Covariance_true_val <- function(
       }
     }) -> nms
     nms <- unlist(nms)
-    w_sym <- data.table(t(rowsum(t(Int_var_dt), nms)))
+    w_sym <- data.table::data.table(t(rowsum(t(Int_var_dt), nms)))
     w <- cbind(w[, 1:(4 + q * (p - 1))], w_sym)
   }
 
@@ -1004,7 +986,7 @@ Covariance_true_val <- function(
   Int_range <- ifelse(sat == Inf, Int_range, 2 * Int_range)
   h_type_obs <- h[type_obs == j]
   H <- as.matrix(h_type_obs[match(X$x, h_type_obs$xcoord), -(1:4)])
-  cc <- closepairs(X, rmax = Int_range)
+  cc <- spatstat.geom::closepairs(X, rmax = Int_range)
   Hu <- H[cc$i, ]
   Hv <- H[cc$j, ]
   Sigma_term <- t(Hu) %*% Hv
