@@ -572,7 +572,7 @@ SemiMarkov_fixed_R <- function(
     offsets <- colMeans(w_var, na.rm = T)
     scalings <- apply(w_var, 2, sd, na.rm = T)
   } else {
-    offsets <- rep(0, q * (p - 1) + p * (p + 1) / 2)
+    offsets <- rep(0, (q - 1) * (p - 1) + p * (p + 1) / 2)
     scalings <- rep(1, (q - 1) * (p - 1) + p * (p + 1) / 2)
   }
 
@@ -637,11 +637,11 @@ SemiMarkov_fixed_R <- function(
   # Estimate parameters
   opt <- beta_estimation_rcpp(w, betastart, p, q, Poisson, quiet = quiet)
   betahat <- opt$par
-  # w <- w_raw
+  w <- w_raw
   var_cols <- 5:ncol(w)
   var_col_names <- colnames(w)[var_cols]
   betahat <- betahat / back_transform
-  pred <- type_pred(w, betahat)
+  pred <- SeMaCoPE:::type_pred(w, betahat)
   colnames(pred)[4] <- "type_pred"
   pred[, ":="(lambda = NULL, Lambda = NULL)]
 
