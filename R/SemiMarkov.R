@@ -483,7 +483,7 @@ type_pred <- function(w, beta) {
 # Fitting Semi parametric Markov model for fixed R and c -----------------------
 SemiMarkov_fixed_R <- function(
   X, covariate, edgecorrection = NULL, R_within,
-  R_between, sat = Inf, standardize = TRUE, Poisson = FALSE
+  R_between, sat = Inf, standardize = TRUE, Poisson = FALSE, quiet = FALSE
 ) {
   if (!(is.integer(X$marks) | is.factor(X$marks))) {
     stop("Marks of point process must be of type either integer or factor.")
@@ -635,7 +635,7 @@ SemiMarkov_fixed_R <- function(
   }
 
   # Estimate parameters
-  opt <- beta_estimation_rcpp(w, betastart, p, q, Poisson)
+  opt <- beta_estimation_rcpp(w, betastart, p, q, Poisson, quiet = quiet)
   betahat <- opt$par
   # w <- w_raw
   var_cols <- 5:ncol(w)
@@ -768,6 +768,26 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
 }
 
 # Semi-parametric Markov model -------------------------------------------------
+loglik_internal <- function(
+  X, covariate, edgecorrection, R_within, 
+  R_between, sat, standardize, Poisson
+) {
+  S <- SemiMarkov_fixed_R(
+    X,
+    covariate,
+    edgecorrection,
+    R_within,
+    R_between,
+    sat,
+    standardize,
+    Poisson,
+    quiet = TRUE
+  )
+
+  return(S$maximum_log_likelihood)
+}
+
+
 #' Fits semi-parametric Markov model to multitype point pattern data with a
 #' fixed interaction radius and saturation parameter.
 #' @param X Multiyupe point pattern data. Must be a spatstat ppp object with
@@ -797,6 +817,8 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
 #' maximises the log composite likelihood is used.
 #' @param Poisson If TRUE, a Poisson process is fitted. If FALSE interaction
 #' terms will be included.
+#' @param quiet Should the function keep quiet about points with missing values
+#' in the covariate being dropped?
 #' @return A list that includes betahat (the parameter estimate of beta),
 #' converg (convergence information passed from optim), ref_type (the reference
 #' type (currently not implemented)), R_within (the interaction range between
@@ -809,11 +831,10 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
 #' likelihood).
 #' @export
 SemiMarkov <- function(
-  X, covariate, edgecorrection = NULL, R_within,
-  R_between, sat = Inf, standardize = TRUE, Poisson = FALSE
+  X, covariate, edgecorrection = NULL, R_within, R_between, 
+  sat = Inf, standardize = TRUE, Poisson = FALSE, ncores = 1, quiet = FALSE
 ) {
   if (length(R_within) == 1 & length(R_between) == 1 & length(sat) == 1) {
-    a <- Sys.time()
     S <- SemiMarkov_fixed_R(
       X,
       covariate = covariate,
@@ -822,11 +843,10 @@ SemiMarkov <- function(
       R_between = R_between,
       sat = sat,
       standardize = standardize,
-      Poisson = Poisson
+      Poisson = Poisson,
+      quiet = quiet
     )
-    Sys.time() - a
 
-    a <- Sys.time()
     std_err <- Standard_error_matrix(
       X = X,
       w = S$w,
@@ -835,7 +855,6 @@ SemiMarkov <- function(
       R_between = R_between,
       sat = sat
     )
-    Sys.time() - a
 
     out <- c(S, std_err)
     return(out)
@@ -844,26 +863,62 @@ SemiMarkov <- function(
   opt <- expand.grid(R_within = R_within, R_between = R_between, sat = sat)
   R_omit <- opt$R_within == opt$R_between
   opt <- opt[!R_omit, ]
-  res_list <- list()
-  likelihoods <- rep(NA, nrow(opt))
-  for (i in 1:nrow(opt)) {
-    cat(paste("Fitting model", i, "out of", nrow(opt)), "\r")
-    S <- SemiMarkov_fixed_R(
-      X,
-      covariate = covariate,
-      edgecorrection = edgecorrection,
-      R_within = opt[i, "R_within"],
-      R_between = opt[i, "R_between"],
-      sat = opt[i, "sat"],
-      standardize = standardize,
-      Poisson = Poisson
+
+  if (ncores == 1) {
+    likelihoods <- rep(NA, nrow(opt))
+    for (i in 1:nrow(opt)) {
+      cat(paste("Fitting model", i, "out of", nrow(opt)), "\r")
+      likelihoods[i] <- loglik_internal(
+        X,
+        covariate = covariate,
+        edgecorrection = edgecorrection,
+        R_within = opt[i, "R_within"],
+        R_between = opt[i, "R_between"],
+        sat = opt[i, "sat"],
+        standardize = standardize,
+        Poisson = Poisson
+      )
+    }
+  }
+
+  if (ncores > 1) {
+    helper_fct <- function(i) {
+      l <- loglik_internal(
+        X,
+        covariate = covariate,
+        edgecorrection = edgecorrection,
+        R_within = opt[i, "R_within"],
+        R_between = opt[i, "R_between"],
+        sat = opt[i, "sat"],
+        standardize = standardize,
+        Poisson = Poisson
+      )
+      return(l)
+    }
+
+    future::plan(future::multisession, workers = ncores)
+    lik_list <- furrr::future_map(
+      1:nrow(opt),
+      helper_fct,
+      .progress = TRUE
     )
-    res_list[[i]] <- S
-    likelihoods[i] <- S$maximum_log_likelihood
+
+    likelihoods <- unlist(lik_list)
   }
 
   w <- which.max(likelihoods[likelihoods != 0])
-  S <- res_list[[w]]
+  S <- SemiMarkov_fixed_R(
+    X,
+    covariate = covariate,
+    edgecorrection = edgecorrection,
+    R_within = opt[w, "R_within"],
+    R_between = opt[w, "R_between"],
+    sat = opt[w, "sat"],
+    standardize = standardize,
+    Poisson = Poisson,
+    quiet = quiet
+  )
+
   std_err <- Standard_error_matrix(
     X,
     S$w,
@@ -874,6 +929,27 @@ SemiMarkov <- function(
   )
   out <- c(S, std_err)
   return(out)
+
+  # opt <- expand.grid(R_within = R_within, R_between = R_between, sat = sat)
+  # R_omit <- opt$R_within == opt$R_between
+  # opt <- opt[!R_omit, ]
+  # res_list <- list()
+  # likelihoods <- rep(NA, nrow(opt))
+  # for (i in 1:nrow(opt)) {
+  #   cat(paste("Fitting model", i, "out of", nrow(opt)), "\r")
+  #   S <- SemiMarkov_fixed_R(
+  #     X,
+  #     covariate = covariate,
+  #     edgecorrection = edgecorrection,
+  #     R_within = opt[i, "R_within"],
+  #     R_between = opt[i, "R_between"],
+  #     sat = opt[i, "sat"],
+  #     standardize = standardize,
+  #     Poisson = Poisson
+  #   )
+  #   res_list[[i]] <- S
+  #   likelihoods[i] <- S$maximum_log_likelihood
+  # }
 }
 
 # Check second order term ------------------------------------------------------

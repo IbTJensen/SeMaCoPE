@@ -13,7 +13,9 @@ SemiMarkov(
   R_between,
   sat = Inf,
   standardize = TRUE,
-  Poisson = FALSE
+  Poisson = FALSE,
+  ncores = 1,
+  quiet = FALSE
 )
 }
 \arguments{
@@ -51,6 +53,9 @@ into account. It is recommended to leave as TRUE.}
 
 \item{Poisson}{If TRUE, a Poisson process is fitted. If FALSE interaction
 terms will be included.}
+
+\item{quiet}{Should the function keep quiet about points with missing values
+in the covariate being dropped?}
 }
 \value{
 A list that includes betahat (the parameter estimate of beta),
