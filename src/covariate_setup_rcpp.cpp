@@ -21,7 +21,7 @@
 // quantity it produces is just
 //
 //   DeltaS_{m,l}(u) = # { v : type(v) = m, d(u,v) <= R[m,l],
-//                             N_{m,l}(v) <= sat_l - 1 }
+//                             N_{m,l}(v) - [type(u) == l] <= sat_l - 1 }
 //   N_{m,l}(v)      = # { z != v : type(z) = l, d(v,z) <= R[m,l] }
 //   R[m,l]          = R_within if m == l, else R_between
 //
@@ -30,6 +30,22 @@
 // needed -- two passes of radius queries suffice. Both passes reuse the same
 // 2p cell grids (one per type at each of the two radii), since R[m,l] only
 // ever takes the two values R_within and R_between.
+//
+// The `- [type(u) == l]` term is the leave-u-out correction, and it is the
+// whole point of the saturation statistic. Adding a type-l point at u raises
+// neighbour v's saturated type-l count only if v's count *on the pattern with
+// u removed* is still below sat. N_{m,l}(v) is computed once over the full
+// observed pattern, so whenever u's own observed mark is l it has already
+// counted itself into every neighbour it is about to increment, and the test
+// silently tightens to N^(-u) <= sat_l - 2. The indicator is therefore a
+// property of the PAIR (u, v), not of v alone. Mirrors the R fix at
+// R/SemiMarkov.R:226-233 (`s_Strauss_kl_v - as.integer(type_obs == l)`).
+//
+// No distance guard is needed with the subtraction: it is only applied to
+// v's that grid_query has already accepted as lying within R[m,l] of u, and
+// the pair radius always equals the count radius (m == l uses R_within on
+// both sides, m != l uses R_between on both). When sat_l is Inf both branches
+// reduce to a weight of 1, so Strauss and Poisson output is unchanged.
 //
 // A NOTE ON CORRECTNESS RELATIVE TO THE R VERSION
 // -----------------------------------------------
@@ -217,7 +233,11 @@ List covariate_setup_core_cpp(
   // neighbour's own count N_{m,l}, so it is rebuilt per (m, l) pair, but the
   // grids are reused.
   NumericMatrix DeltaS(n, p2);
-  std::vector<double> wt(n, 0.0);
+  // Two weight vectors, selected by the query point's own type: the indicator
+  // depends on the pair (u, v), not on v alone. wt_self applies when u's
+  // observed mark is l, in which case u has already counted itself into
+  // N_{m,l}(v) and must be removed again.
+  std::vector<double> wt_other(n, 0.0), wt_self(n, 0.0);
   for (int m = 0; m < p; ++m) {
     for (int l = 0; l < p; ++l) {
       const bool same = (m == l);
@@ -226,15 +246,19 @@ List covariate_setup_core_cpp(
       const double radius = same ? R_within : R_between;
       const CellGrid& g = same ? grid_w[m] : grid_b[m];
 
-      std::fill(wt.begin(), wt.end(), 0.0);
+      std::fill(wt_other.begin(), wt_other.end(), 0.0);
+      std::fill(wt_self.begin(), wt_self.end(), 0.0);
       for (std::size_t t = 0; t < idx_by_type[m].size(); ++t) {
         const int v = idx_by_type[m][t];
-        wt[v] = (N[v] <= thresh) ? 1.0 : 0.0;
+        wt_other[v] = (N[v] <= thresh) ? 1.0 : 0.0;
+        wt_self[v] = (N[v] - 1.0 <= thresh) ? 1.0 : 0.0;
       }
 
       const int c = m * p + l;
       for (int u = 0; u < n; ++u) {
-        DeltaS(u, c) = grid_query(g, px[u], py[u], radius, px, py, wt.data(), u);
+        const double* wsel =
+          (type[u] - 1 == l) ? wt_self.data() : wt_other.data();
+        DeltaS(u, c) = grid_query(g, px[u], py[u], radius, px, py, wsel, u);
       }
       Rcpp::checkUserInterrupt();
     }

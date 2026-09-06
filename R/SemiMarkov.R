@@ -224,7 +224,12 @@ Covariate_setup <- function(
     DS[, l := as.numeric(as.character(l))]
     DS[, sat := sat_i[as.numeric(l)]]
     DS[,
-      .(DeltaS_kl = sum(!is.na(Neighbour_x) & s_Strauss_kl_v <= sat - 1)),
+      .(
+        DeltaS_kl = sum(
+          !is.na(Neighbour_x) &
+            s_Strauss_kl_v - as.integer(type_obs == l) <= sat - 1
+        )
+      ),
       by = list(xcoord, ycoord, type_obs, Neighbour_type, l)
     ] -> Delta_S_maybe
     for (k in 1:p) {
