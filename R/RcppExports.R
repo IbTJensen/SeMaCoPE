@@ -17,3 +17,7 @@ covariate_setup_core_cpp <- function(x, y, type, p, R_within, R_between, sat_i, 
     .Call(`_SeMaCoPE_covariate_setup_core_cpp`, x, y, type, p, R_within, R_between, sat_i, want_components)
 }
 
+covariate_setup_core_sat2_cpp <- function(x, y, type, p, R_within, R_between, sat_within, sat_between, want_components = TRUE) {
+    .Call(`_SeMaCoPE_covariate_setup_core_sat2_cpp`, x, y, type, p, R_within, R_between, sat_within, sat_between, want_components)
+}
+

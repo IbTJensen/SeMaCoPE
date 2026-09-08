@@ -77,12 +77,32 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// covariate_setup_core_sat2_cpp
+List covariate_setup_core_sat2_cpp(NumericVector x, NumericVector y, IntegerVector type, int p, double R_within, double R_between, double sat_within, double sat_between, bool want_components);
+RcppExport SEXP _SeMaCoPE_covariate_setup_core_sat2_cpp(SEXP xSEXP, SEXP ySEXP, SEXP typeSEXP, SEXP pSEXP, SEXP R_withinSEXP, SEXP R_betweenSEXP, SEXP sat_withinSEXP, SEXP sat_betweenSEXP, SEXP want_componentsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type y(ySEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type type(typeSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< double >::type R_within(R_withinSEXP);
+    Rcpp::traits::input_parameter< double >::type R_between(R_betweenSEXP);
+    Rcpp::traits::input_parameter< double >::type sat_within(sat_withinSEXP);
+    Rcpp::traits::input_parameter< double >::type sat_between(sat_betweenSEXP);
+    Rcpp::traits::input_parameter< bool >::type want_components(want_componentsSEXP);
+    rcpp_result_gen = Rcpp::wrap(covariate_setup_core_sat2_cpp(x, y, type, p, R_within, R_between, sat_within, sat_between, want_components));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SeMaCoPE_omp_max_threads_cpp", (DL_FUNC) &_SeMaCoPE_omp_max_threads_cpp, 0},
     {"_SeMaCoPE_beta_newton_omp_cpp", (DL_FUNC) &_SeMaCoPE_beta_newton_omp_cpp, 10},
     {"_SeMaCoPE_beta_newton_cpp", (DL_FUNC) &_SeMaCoPE_beta_newton_cpp, 8},
     {"_SeMaCoPE_covariate_setup_core_cpp", (DL_FUNC) &_SeMaCoPE_covariate_setup_core_cpp, 8},
+    {"_SeMaCoPE_covariate_setup_core_sat2_cpp", (DL_FUNC) &_SeMaCoPE_covariate_setup_core_sat2_cpp, 9},
     {NULL, NULL, 0}
 };
 
