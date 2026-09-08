@@ -52,7 +52,18 @@ Covariate_setup_rcpp <- function(
 ) {
   p <- length(Xis)
   n <- X$n
-  sat_i <- rep(sat, p)
+  if (length(sat) %notin% c(1, p)) {
+    err_msg <- paste(
+      "sat should be either a single number or a",
+      "vector with one entry per point type."
+    )
+    stop(err_msg)
+  }
+  
+  sat_i <- sat
+  if(length(sat) == 1){
+    sat_i <- rep(sat, p)
+  }
 
   prelim_dt <- data.table::data.table(
     xcoord = X$x,

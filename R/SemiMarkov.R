@@ -101,7 +101,6 @@ Covariate_setup <- function(
 ) {
   p <- length(Xis)
   n <- X$n
-  # sat_i <- sat*nis/nis[p]
   sat_i <- rep(sat, p)
   sat_all <- rep(sat_i, nis)
   # The data.table prelim_dt will end up containing s_kl and Delta S_kl in each
@@ -488,7 +487,8 @@ type_pred <- function(w, beta) {
 # Fitting Semi parametric Markov model for fixed R and c -----------------------
 SemiMarkov_fixed_R <- function(
   X, covariate, edgecorrection = NULL, R_within,
-  R_between, sat = Inf, standardize = TRUE, Poisson = FALSE, quiet = FALSE
+  R_between, sat_within = Inf, sat_between = Inf,
+  standardize = TRUE, Poisson = FALSE, quiet = FALSE
 ) {
   if (!(is.integer(X$marks) | is.factor(X$marks))) {
     stop("Marks of point process must be of type either integer or factor.")
@@ -527,9 +527,9 @@ SemiMarkov_fixed_R <- function(
   #   X, Xis, nis, covariate, R_within, 
   #   R_between, sat, Poisson, mark.pp
   # )
-  w <- Covariate_setup_rcpp(
+  w <- Covariate_setup_sat2_rcpp(
     X, Xis, nis, covariate, R_within, 
-    R_between, sat, Poisson, mark.pp
+    R_between, sat_within, sat_between, Poisson, mark.pp
   )
   q <- w$q
   w <- w$w
@@ -675,7 +675,8 @@ SemiMarkov_fixed_R <- function(
     ref_type = levels(X$marks)[1],
     R_within = R_within,
     R_between = R_between,
-    sat = sat,
+    sat_within = sat_within,
+    sat_between = sat_between,
     Xis = Xis,
     w = w_raw,
     q = q,
@@ -688,7 +689,7 @@ SemiMarkov_fixed_R <- function(
 }
 
 # Estimate standard errors -----------------------------------------------------
-Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
+Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat_within, sat_between) {
   # Fitted log-lambda (up to non-parametric factor)
   log_lambda <- as.matrix(w[, -(1:4)]) %*% betahat
   w[, lambda := exp(log_lambda)]
@@ -714,7 +715,7 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
 
   # Second order term
   Int_range <- max(R_within, R_between)
-  Int_range <- ifelse(sat == Inf, Int_range, 2 * Int_range)
+  Int_range <- ifelse(sat_within == Inf & sat_between == Inf, Int_range, 2 * Int_range)
   h_type_obs <- na.omit(h)[type_obs == j]
 
   X_new <- spatstat.geom::ppp(
@@ -775,7 +776,7 @@ Standard_error_matrix <- function(X, w, betahat, R_within, R_between, sat) {
 # Semi-parametric Markov model -------------------------------------------------
 loglik_internal <- function(
   X, covariate, edgecorrection, R_within, 
-  R_between, sat, standardize, Poisson
+  R_between, sat_within, sat_between, standardize, Poisson
 ) {
   S <- SemiMarkov_fixed_R(
     X,
@@ -783,7 +784,8 @@ loglik_internal <- function(
     edgecorrection,
     R_within,
     R_between,
-    sat,
+    sat_within,
+    sat_between,
     standardize,
     Poisson,
     quiet = TRUE
@@ -816,7 +818,11 @@ loglik_internal <- function(
 #' standardization should be performed internally on the covariates. For
 #' interpretability, parameter estimates are transformed back to take this
 #' into account. It is recommended to leave as TRUE.
-#' @param sat Indicates the saturation parameter. If set to Inf, a Strauss
+#' @param sat_within Indicates the within-type saturation parameter. If set to Inf, a Strauss
+#' model will be fitted. If a single value is provided, this value will be used.
+#' If a vector is used, a grid search is carried out, and the value that
+#' maximises the log composite likelihood is used.
+#' @param sat_between Indicates the between-type saturation parameter. If set to Inf, a Strauss
 #' model will be fitted. If a single value is provided, this value will be used.
 #' If a vector is used, a grid search is carried out, and the value that
 #' maximises the log composite likelihood is used.
@@ -837,16 +843,23 @@ loglik_internal <- function(
 #' @export
 SemiMarkov <- function(
   X, covariate, edgecorrection = NULL, R_within, R_between, 
-  sat = Inf, standardize = TRUE, Poisson = FALSE, ncores = 1, quiet = FALSE
+  sat_within = Inf, sat_between = Inf, standardize = TRUE, 
+  Poisson = FALSE, ncores = 1, quiet = FALSE
 ) {
-  if (length(R_within) == 1 & length(R_between) == 1 & length(sat) == 1) {
+  if (
+    length(R_within) == 1 &
+      length(R_between) == 1 &
+      length(sat_within) == 1 &
+      length(sat_between == 1)
+  ) {
     S <- SemiMarkov_fixed_R(
       X,
       covariate = covariate,
       edgecorrection = edgecorrection,
       R_within = R_within,
       R_between = R_between,
-      sat = sat,
+      sat_within = sat_within,
+      sat_between = sat_between,
       standardize = standardize,
       Poisson = Poisson,
       quiet = quiet
@@ -858,14 +871,20 @@ SemiMarkov <- function(
       betahat = S$betahat,
       R_within = R_within,
       R_between = R_between,
-      sat = sat
+      sat_within = sat_within,
+      sat_between = sat_between
     )
 
     out <- c(S, std_err)
     return(out)
   }
-
-  opt <- expand.grid(R_within = R_within, R_between = R_between, sat = sat)
+  
+  opt <- expand.grid(
+    R_within = R_within,
+    R_between = R_between,
+    sat_within = sat_within,
+    sat_between = sat_between
+  )
   R_omit <- opt$R_within == opt$R_between
   opt <- opt[!R_omit, ]
 
@@ -879,7 +898,8 @@ SemiMarkov <- function(
         edgecorrection = edgecorrection,
         R_within = opt[i, "R_within"],
         R_between = opt[i, "R_between"],
-        sat = opt[i, "sat"],
+        sat_within = opt[i, "sat_within"],
+        sat_between = opt[i, "sat_between"],
         standardize = standardize,
         Poisson = Poisson
       )
@@ -894,7 +914,8 @@ SemiMarkov <- function(
         edgecorrection = edgecorrection,
         R_within = opt[i, "R_within"],
         R_between = opt[i, "R_between"],
-        sat = opt[i, "sat"],
+        sat_within = opt[i, "sat_within"],
+        sat_between = opt[i, "sat_between"],
         standardize = standardize,
         Poisson = Poisson
       )
@@ -910,6 +931,7 @@ SemiMarkov <- function(
 
     likelihoods <- unlist(lik_list)
   }
+  liks <- data.table::data.table(opt, likelihoods = likelihoods)
 
   w <- which.max(likelihoods[likelihoods != 0])
   S <- SemiMarkov_fixed_R(
@@ -918,7 +940,8 @@ SemiMarkov <- function(
     edgecorrection = edgecorrection,
     R_within = opt[w, "R_within"],
     R_between = opt[w, "R_between"],
-    sat = opt[w, "sat"],
+    sat_within = opt[w, "sat_within"],
+    sat_between = opt[w, "sat_between"],
     standardize = standardize,
     Poisson = Poisson,
     quiet = quiet
@@ -930,153 +953,10 @@ SemiMarkov <- function(
     S$betahat,
     opt[w, "R_within"],
     opt[w, "R_between"],
-    opt[w, "sat"]
+    opt[w, "sat_within"],
+    opt[w, "sat_between"]
   )
-  out <- c(S, std_err)
-  return(out)
-
-  # opt <- expand.grid(R_within = R_within, R_between = R_between, sat = sat)
-  # R_omit <- opt$R_within == opt$R_between
-  # opt <- opt[!R_omit, ]
-  # res_list <- list()
-  # likelihoods <- rep(NA, nrow(opt))
-  # for (i in 1:nrow(opt)) {
-  #   cat(paste("Fitting model", i, "out of", nrow(opt)), "\r")
-  #   S <- SemiMarkov_fixed_R(
-  #     X,
-  #     covariate = covariate,
-  #     edgecorrection = edgecorrection,
-  #     R_within = opt[i, "R_within"],
-  #     R_between = opt[i, "R_between"],
-  #     sat = opt[i, "sat"],
-  #     standardize = standardize,
-  #     Poisson = Poisson
-  #   )
-  #   res_list[[i]] <- S
-  #   likelihoods[i] <- S$maximum_log_likelihood
-  # }
-}
-
-# Check second order term ------------------------------------------------------
-# compute the sensitivity and second order term in the true value. This is
-# for model evaluation purposes
-Covariance_true_val <- function(
-  X, covariate, edgecorrection = NULL, R_within,
-  R_between, sat = Inf, Poisson = FALSE, true.param
-) {
-  if (!(is.integer(X$marks) | is.factor(X$marks))) {
-    stop("Marks of point process must be of type either integer or factor.")
-  }
-
-  # Jitters duplicated points by a small distance
-  m <- min(R_within, R_between)
-  duplicates <- duplicated(data.frame(X$x, X$y))
-  d <- sum(duplicates)
-
-  perturb_x <- runif(d, -m / 1000, m / 1000)
-  perturb_y <- runif(d, -m / 1000, m / 1000)
-
-  if (is.matrix(covariate) | is.data.frame(covariate)) {
-    pts_X <- paste(X$x, X$y, sep = "-")
-    pts_covariates <- paste(covariate$xcoord, covariate$ycoord, sep = "-")
-    reorder <- match(pts_X, pts_covariates)
-    covariate <- covariate[reorder, ]
-    covariate$xcoord[duplicates] <- covariate$xcoord[duplicates] + perturb_x
-    covariate$ycoord[duplicates] <- covariate$ycoord[duplicates] + perturb_y
-  }
-
-  X$x[duplicates] <- X$x[duplicates] + perturb_x
-  X$y[duplicates] <- X$y[duplicates] + perturb_y
-
-  mark.pp <- sort(unique(X$marks))
-  p <- length(mark.pp)
-  Xis = list()
-  nis = rep(0, p)
-  for (i in 1:p) {
-    Xis[[i]] = X[mark.pp[i] == X$marks]
-    nis[i] = Xis[[i]]$n
-  }
-
-  w <- Covariate_setup(
-    X,
-    Xis,
-    nis,
-    covariate,
-    R_within,
-    R_between,
-    sat,
-    Poisson,
-    mark.pp
-  )
-  q <- w$q
-  w <- w$w
-
-  if (!is.null(edgecorrection)) {
-    erodedwindow = spatstat.geom::erosion(X$window, edgecorrection)
-    pts_in_window <- spatstat.geom::inside.owin(x = w$xcoord, y = w$ycoord, w = erodedwindow)
-    w <- w[pts_in_window]
-    X <- X[spatstat.geom::inside.owin(X, w = erodedwindow), ]
-    for (i in 1:p) {
-      pts_in_window <- spatstat.geom::inside.owin(Xis[[i]], w = erodedwindow)
-      Xis[[i]] = Xis[[i]][pts_in_window, ]
-      nis[i] = sum(pts_in_window)
-    }
-  }
-
-  w_raw <- data.table::data.table(w)
-  if (!Poisson) {
-    Int_var_dt <- w[, (4 + q * (p - 1) + 1):ncol(w)]
-    nms <- colnames(Int_var_dt)
-    lapply(strsplit(nms, "-"), function(x) {
-      if (x[1] > x[2]) {
-        return(paste(x[2:1], collapse = "-"))
-      } else {
-        return(paste(x, collapse = "-"))
-      }
-    }) -> nms
-    nms <- unlist(nms)
-    w_sym <- data.table::data.table(t(rowsum(t(Int_var_dt), nms)))
-    w <- cbind(w[, 1:(4 + q * (p - 1))], w_sym)
-  }
-
-  var_cols <- 5:ncol(w)
-  var_col_names <- colnames(w)[var_cols]
-
-  # Fitted log-lambda (up to non-parametric factor)
-  log_lambda <- as.matrix(w[, -(1:4)]) %*% true.param
-  w[, lambda := exp(log_lambda)]
-  w_Lambda <- w[, .(Lambda = sum(lambda)), list(xcoord, ycoord, type_obs)]
-  w <- merge(w, w_Lambda, by = c("xcoord", "ycoord", "type_obs"))
-  w[, prob := lambda / Lambda]
-
-  h <- w[,
-    lapply(.SD, function(x) x - sum(x * prob)),
-    by = list(xcoord, ycoord, type_obs),
-    .SDcols = var_col_names
-  ]
-  h <- cbind(w[, 1:4], h[, -(1:3)])
-
-  # Matrix-matrix product
-  w_mat <- as.matrix(w[, ..var_cols])
-  h_mat <- as.matrix(h[, ..var_cols])
-  probs <- w$prob
-  S <- t(w_mat * probs) %*% h_mat
-
-  # Second order term
-  Int_range <- max(R_within, R_between)
-  Int_range <- ifelse(sat == Inf, Int_range, 2 * Int_range)
-  h_type_obs <- h[type_obs == j]
-  H <- as.matrix(h_type_obs[match(X$x, h_type_obs$xcoord), -(1:4)])
-  cc <- spatstat.geom::closepairs(X, rmax = Int_range)
-  Hu <- H[cc$i, ]
-  Hv <- H[cc$j, ]
-  Sigma_term <- t(Hu) %*% Hv
-
-  rownames(Sigma_term) <- names(betahat)
-  colnames(Sigma_term) <- names(betahat)
-  rownames(S) <- names(betahat)
-  colnames(S) <- names(betahat)
-
-  out <- list(S = S, Sigma_term = Sigma_term)
+  out <- c(S, std_err, likelihoods = liks)
   return(out)
 }
+
