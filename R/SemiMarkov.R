@@ -956,7 +956,7 @@ SemiMarkov <- function(
     opt[w, "sat_within"],
     opt[w, "sat_between"]
   )
-  out <- c(S, std_err, likelihoods = liks)
+  out <- c(S, std_err, likelihoods = list(liks))
   return(out)
 }
 
