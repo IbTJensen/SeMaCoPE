@@ -31,5 +31,7 @@ globalVariables(c(
   "s_Strauss_kl_v", "DeltaS_kl", "kl_name",
   # data.table's `..name` (look up `name` in the calling frame) syntax
   "..between_idx", "..covar_cols", "..Covariate_cols", "..Intercept_cols",
-  "..m", "..p", "..rep_col", "..var_cols", "..within_idx"
+  "..m", "..p", "..rep_col", "..var_cols", "..within_idx",
+  # SemiMarkov_clic() selection table
+  "clic", "converged", "singular", "eligible", "selected"
 ))

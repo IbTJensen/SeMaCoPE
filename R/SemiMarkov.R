@@ -681,6 +681,8 @@ SemiMarkov_fixed_R <- function(
     w = w_raw,
     q = q,
     maximum_log_likelihood = opt$value,
+    convergence = opt$convergence,
+    convergence_message = opt$message,
     pred = pred,
     pred_no_int = pred_no_int
   )
