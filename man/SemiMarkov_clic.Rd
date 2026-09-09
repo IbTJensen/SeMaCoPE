@@ -43,13 +43,9 @@ provided, this value will be used. If a vector is used, a grid search is
 carried out, and the value that maximises the log composite likelihood is
 used.}
 
-\item{sat_within}{Indicates the within-type saturation parameter. If set to Inf, a Strauss
-model will be fitted. If a single value is provided, this value will be used.
-If a vector is used, a grid search is carried out, and the value that
-maximises the log composite likelihood is used.}
-
-\item{sat_between}{Indicates the between-type saturation parameter. If set to Inf, a Strauss
-model will be fitted. If a single value is provided, this value will be used.
+\item{sat_within}{Indicates the between-type saturation parameter.
+To use this (and sat_within), set sat = NULL. If set to Inf, a Strauss model
+will be fitted. If a single value is provided, this value will be used.
 If a vector is used, a grid search is carried out, and the value that
 maximises the log composite likelihood is used.}
 

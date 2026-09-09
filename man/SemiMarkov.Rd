@@ -11,8 +11,9 @@ SemiMarkov(
   edgecorrection = NULL,
   R_within,
   R_between,
-  sat_within = Inf,
-  sat_between = Inf,
+  sat = Inf,
+  sat_within = NULL,
+  sat_between = NULL,
   standardize = TRUE,
   Poisson = FALSE,
   ncores = 1,
@@ -42,13 +43,15 @@ provided, this value will be used. If a vector is used, a grid search is
 carried out, and the value that maximises the log composite likelihood is
 used.}
 
-\item{sat_within}{Indicates the within-type saturation parameter. If set to Inf, a Strauss
-model will be fitted. If a single value is provided, this value will be used.
-If a vector is used, a grid search is carried out, and the value that
-maximises the log composite likelihood is used.}
+\item{sat}{Indicates the common saturation parameter among all types.
+For seperate within-type and between-type saturation parameters, set sat = NULL.
+If set to Inf, a Strauss model will be fitted. If a single value is provided,
+this value will be used. If a vector is used, a grid search is carried out,
+and the value that maximises the log composite likelihood is used.}
 
-\item{sat_between}{Indicates the between-type saturation parameter. If set to Inf, a Strauss
-model will be fitted. If a single value is provided, this value will be used.
+\item{sat_within}{Indicates the between-type saturation parameter.
+To use this (and sat_within), set sat = NULL. If set to Inf, a Strauss model
+will be fitted. If a single value is provided, this value will be used.
 If a vector is used, a grid search is carried out, and the value that
 maximises the log composite likelihood is used.}
 

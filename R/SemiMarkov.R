@@ -820,12 +820,19 @@ loglik_internal <- function(
 #' standardization should be performed internally on the covariates. For
 #' interpretability, parameter estimates are transformed back to take this
 #' into account. It is recommended to leave as TRUE.
-#' @param sat_within Indicates the within-type saturation parameter. If set to Inf, a Strauss
-#' model will be fitted. If a single value is provided, this value will be used.
+#' @param sat Indicates the common saturation parameter among all types.
+#' For seperate within-type and between-type saturation parameters, set sat = NULL.
+#' If set to Inf, a Strauss model will be fitted. If a single value is provided, 
+#' this value will be used. If a vector is used, a grid search is carried out, 
+#' and the value that maximises the log composite likelihood is used.
+#' @param sat_within Indicates the within-type saturation parameter. 
+#' To use this (and sat_between), set sat = NULL. If set to Inf, a Strauss model 
+#' will be fitted. If a single value is provided, this value will be used.
 #' If a vector is used, a grid search is carried out, and the value that
 #' maximises the log composite likelihood is used.
-#' @param sat_between Indicates the between-type saturation parameter. If set to Inf, a Strauss
-#' model will be fitted. If a single value is provided, this value will be used.
+#' @param sat_within Indicates the between-type saturation parameter. 
+#' To use this (and sat_within), set sat = NULL. If set to Inf, a Strauss model 
+#' will be fitted. If a single value is provided, this value will be used.
 #' If a vector is used, a grid search is carried out, and the value that
 #' maximises the log composite likelihood is used.
 #' @param Poisson If TRUE, a Poisson process is fitted. If FALSE interaction
@@ -845,15 +852,33 @@ loglik_internal <- function(
 #' @export
 SemiMarkov <- function(
   X, covariate, edgecorrection = NULL, R_within, R_between, 
-  sat_within = Inf, sat_between = Inf, standardize = TRUE, 
+  sat = Inf, sat_within = NULL, sat_between = NULL, standardize = TRUE, 
   Poisson = FALSE, ncores = 1, quiet = FALSE
 ) {
-  if (
-    length(R_within) == 1 &
-      length(R_between) == 1 &
-      length(sat_within) == 1 &
-      length(sat_between == 1)
-  ) {
+  if (!is.null(sat) & (!is.null(sat_within) | !is.null(sat_between))) {
+    err_msg <- paste(
+      "sat_within and sat_between must be NULL when sat is non-NULL."
+    )
+    stop(err_msg)
+  }
+
+  if (is.null(sat) & (is.null(sat_within) | is.null(sat_between))) {
+    err_msg <- paste(
+      "When sat = NULL both sat_within and sat_between must be non-NUll."
+    )
+    stop(err_msg)
+  }
+
+  if (!is.null(sat)) {
+    sat_within <- sat
+    sat_between <- sat
+  }
+
+  is_R_len1 <- length(R_within) == 1 & length(R_between) == 1
+  is_sats_len1 <- length(sat_within) == 1 & length(sat_between == 1)
+
+  if (is_R_len1 & is_sats_len1) {
+
     S <- SemiMarkov_fixed_R(
       X,
       covariate = covariate,
@@ -889,6 +914,11 @@ SemiMarkov <- function(
   )
   R_omit <- opt$R_within == opt$R_between
   opt <- opt[!R_omit, ]
+
+  if (!is.null(sat)) {
+    sat_omit <- opt$sat_within != opt$sat_between
+    opt <- opt[!sat_omit, ]
+  }
 
   if (ncores == 1) {
     likelihoods <- rep(NA, nrow(opt))
