@@ -490,9 +490,21 @@ SemiMarkov_fixed_R <- function(
   R_between, sat_within = Inf, sat_between = Inf,
   standardize = TRUE, Poisson = FALSE, quiet = FALSE
 ) {
-  if (!(is.integer(X$marks) | is.factor(X$marks))) {
-    stop("Marks of point process must be of type either integer or factor.")
+  if (!is.integer(X$marks) & !is.factor(X$marks) & !is.character(X$marks)) {
+    stop("Marks of X must characters, integers or factor.")
   }
+
+  p <- length(unique(X$marks))
+  if (is.integer(X$marks)) {
+    marks <- sort(unique(X$marks))
+    X$marks <- factor(X$marks, levels = marks[c(p, 1:(p - 1))])
+  }
+
+  if(is.character(X$marks)){
+    X$marks <- factor(X$marks, levels = sort(unique(X$marks)))
+  }
+
+  levels(X$marks) <- levels(X$marks)[c(2:p, 1)]
 
   # Jitters duplicated points by a small distance
   m <- min(R_within, R_between)
@@ -515,7 +527,9 @@ SemiMarkov_fixed_R <- function(
   X$y[duplicates] <- X$y[duplicates] + perturb_y
 
   mark.pp <- sort(unique(X$marks))
-  p <- length(mark.pp)
+  # mark.pp <- levels(X$marks)[c(p, 1:(p - 1))]
+  # mark.pp <- factor(levels(X$marks), levels = levels(X$marks)[c(2:p, 1)])
+  # mark.pp <- sort(mark.pp)
   Xis = list()
   nis = rep(0, p)
   for (i in 1:p) {
