@@ -504,7 +504,8 @@ SemiMarkov_fixed_R <- function(
     X$marks <- factor(X$marks, levels = sort(unique(X$marks)))
   }
 
-  levels(X$marks) <- levels(X$marks)[c(2:p, 1)]
+  X$marks <- factor(X$marks, levels = levels(X$marks)[c(2:p, 1)])
+  # levels(X$marks) <- levels(X$marks)[c(2:p, 1)]
 
   # Jitters duplicated points by a small distance
   m <- min(R_within, R_between)
