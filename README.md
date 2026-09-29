@@ -3,5 +3,5 @@ This package implements the **Se**mi-parametric **Ma**rkov model with **Co**ndit
 
 To install the package run:
 ```
-devtools::install_github("IbTJensen/SeMaCoPE")
+pak::pak("IbTJensen/SeMaCoPE")
 ```
